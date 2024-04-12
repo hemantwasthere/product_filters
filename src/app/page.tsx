@@ -7,13 +7,15 @@ import { ChevronDown, Filter } from "lucide-react";
 import { NextPage } from "next";
 import { useState } from "react";
 
+import Product from "@/components/Products/Product";
+import ProductSkeleton from "@/components/Products/ProductSkeleton";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { Product } from "@/db";
+import type { Product as TProduct } from "@/db";
 import { cn } from "@/lib/utils";
 
 const SORT_OPTIONS = [
@@ -30,7 +32,7 @@ const Home: NextPage = () => {
   const { data: products } = useQuery({
     queryKey: ["products"],
     queryFn: async () => {
-      const { data } = await axios.post<QueryResult<Product>[]>(
+      const { data } = await axios.post<QueryResult<TProduct>[]>(
         "http://localhost:3000/api/products",
         {
           filter: {
@@ -41,8 +43,6 @@ const Home: NextPage = () => {
       return data;
     },
   });
-
-  console.log(products);
 
   return (
     <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -84,6 +84,22 @@ const Home: NextPage = () => {
           </button>
         </div>
       </div>
+
+      <section className="pb-24 pt-6">
+        <div className="grid grid-cols-1 gap-x-8 gap-y-10 lg:grid-cols-4">
+          {/* Filter  */}
+          <div className=""></div>
+
+          {/* Product Grid  */}
+          <ul className="lg:col-span-3 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-8">
+            {!products
+              ? [...Array(12)].map((_, i) => <ProductSkeleton key={i} />)
+              : products.map((product, i) => (
+                  <Product key={i} product={product.metadata!} />
+                ))}
+          </ul>
+        </div>
+      </section>
     </main>
   );
 };
