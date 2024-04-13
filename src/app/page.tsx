@@ -3,10 +3,12 @@
 import { useQuery } from "@tanstack/react-query";
 import { QueryResult } from "@upstash/vector";
 import axios from "axios";
+import debounce from "lodash.debounce";
 import { ChevronDown, Filter } from "lucide-react";
 import { NextPage } from "next";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 
+import EmptyState from "@/components/Products/EmptyState";
 import Product from "@/components/Products/Product";
 import ProductSkeleton from "@/components/Products/ProductSkeleton";
 import {
@@ -21,6 +23,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { Slider } from "@/components/ui/slider";
 import type { Product as TProduct } from "@/db";
 import { cn } from "@/lib/utils";
 import { ProductState } from "@/lib/validators/product-validator";
@@ -68,6 +71,17 @@ const SIZE_FILTERS = {
   ] as const,
 };
 
+const PRICE_FILTERS = {
+  id: "price",
+  name: "Price",
+  options: [
+    { value: [0, 100], label: "Any price" },
+    { value: [0, 40], label: "Under 40$" },
+    { value: [0, 20], label: "Under 20$" },
+    // custom option defined in jsx
+  ],
+} as const;
+
 const SUBCATEGORIES = [
   {
     name: "T-Shirts",
@@ -104,7 +118,10 @@ const Home: NextPage = () => {
     },
   });
 
-  const { data: products } = useQuery({
+  const MIN_PRICE = Math.min(filter.price.range[0], filter.price.range[1]);
+  const MAX_PRICE = Math.max(filter.price.range[0], filter.price.range[1]);
+
+  const { data: products, refetch } = useQuery({
     queryKey: ["products"],
     queryFn: async () => {
       const { data } = await axios.post<QueryResult<TProduct>[]>(
@@ -112,12 +129,20 @@ const Home: NextPage = () => {
         {
           filter: {
             sort: filter.sort,
+            color: filter.color,
+            price: filter.price.range,
+            size: filter.size,
           },
         }
       );
       return data;
     },
   });
+
+  const onSubmit = () => refetch();
+  const debouncedSubmit = debounce(onSubmit, 400);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const _debouncedSubmit = useCallback(debouncedSubmit, []);
 
   const applyArrayFilter = ({
     category,
@@ -139,9 +164,9 @@ const Home: NextPage = () => {
         [category]: [...prev[category], value],
       }));
     }
-  };
 
-  console.log(filter);
+    _debouncedSubmit();
+  };
 
   return (
     <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -170,6 +195,8 @@ const Home: NextPage = () => {
                       ...prev,
                       sort: option.value,
                     }));
+
+                    _debouncedSubmit();
                   }}
                 >
                   {option.name}
@@ -247,7 +274,7 @@ const Home: NextPage = () => {
                     {SIZE_FILTERS.options.map((option, i) => (
                       <li key={i} className="flex items-center">
                         <input
-                          id={`color-${i}`}
+                          id={`size-${i}`}
                           type="checkbox"
                           className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
                           onChange={() => {
@@ -259,7 +286,7 @@ const Home: NextPage = () => {
                           checked={filter.size.includes(option.value)}
                         />
                         <label
-                          htmlFor={`color-${i}`}
+                          htmlFor={`size-${i}`}
                           className="ml-3 text-sm text-gray-600 select-none"
                         >
                           {option.label}
@@ -269,16 +296,133 @@ const Home: NextPage = () => {
                   </ul>
                 </AccordionContent>
               </AccordionItem>
+
+              {/* Price Filter */}
+              <AccordionItem value="price">
+                <AccordionTrigger className="py-3 text-sm text-gray-400 hover:text-gray-500">
+                  <span className="font-medium text-gray-900">Price</span>
+                </AccordionTrigger>
+
+                <AccordionContent className="pt-6 animate-none">
+                  <ul className="space-y-4">
+                    {PRICE_FILTERS.options.map((option, i) => (
+                      <li key={i} className="flex items-center">
+                        <input
+                          id={`price-${i}`}
+                          type="radio"
+                          className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                          onChange={() => {
+                            setFilter((prev) => ({
+                              ...prev,
+                              price: {
+                                isCustom: false,
+                                range: [...option.value],
+                              },
+                            }));
+
+                            _debouncedSubmit();
+                          }}
+                          checked={
+                            !filter.price.isCustom &&
+                            filter.price.range[0] === option.value[0] &&
+                            filter.price.range[1] === option.value[1]
+                          }
+                        />
+                        <label
+                          htmlFor={`price-${i}`}
+                          className="ml-3 text-sm text-gray-600 select-none"
+                        >
+                          {option.label}
+                        </label>
+                      </li>
+                    ))}
+
+                    <li className="flex justify-center flex-col gap-2">
+                      <div>
+                        <input
+                          id={`price-${PRICE_FILTERS.options.length}`}
+                          type="radio"
+                          className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                          onChange={() => {
+                            setFilter((prev) => ({
+                              ...prev,
+                              price: {
+                                isCustom: true,
+                                range: [0, 100],
+                              },
+                            }));
+
+                            _debouncedSubmit();
+                          }}
+                          checked={filter.price.isCustom}
+                        />
+                        <label
+                          htmlFor={`price-${PRICE_FILTERS.options.length}`}
+                          className="ml-3 text-sm text-gray-600 select-none"
+                        >
+                          Custom
+                        </label>
+                      </div>
+
+                      <div className="flex justify-between">
+                        <p className="font-medium">price</p>
+                        <div>
+                          {filter.price.isCustom
+                            ? MIN_PRICE.toFixed(0)
+                            : filter.price.range[0].toFixed(0)}
+                          $ -{" "}
+                          {filter.price.isCustom
+                            ? MAX_PRICE.toFixed(0)
+                            : filter.price.range[1].toFixed(0)}{" "}
+                          $
+                        </div>
+                      </div>
+                      <Slider
+                        className={cn({
+                          "opacity-50": !filter.price.isCustom,
+                        })}
+                        disabled={!filter.price.isCustom}
+                        onValueChange={(range) => {
+                          const [newMin, newMax] = range;
+
+                          setFilter((prev) => ({
+                            ...prev,
+                            price: {
+                              isCustom: true,
+                              range: [newMin, newMax],
+                            },
+                          }));
+
+                          _debouncedSubmit();
+                        }}
+                        value={
+                          filter.price.isCustom
+                            ? filter.price.range
+                            : DEFAULT_CUSTOM_PRICE_RANGE
+                        }
+                        min={DEFAULT_CUSTOM_PRICE_RANGE[0]}
+                        max={DEFAULT_CUSTOM_PRICE_RANGE[1]}
+                        defaultValue={DEFAULT_CUSTOM_PRICE_RANGE}
+                        step={5}
+                      />
+                    </li>
+                  </ul>
+                </AccordionContent>
+              </AccordionItem>
             </Accordion>
           </div>
 
           {/* Product Grid  */}
           <div className="lg:col-span-3 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-8">
-            {!products
-              ? [...Array(12)].map((_, i) => <ProductSkeleton key={i} />)
-              : products.map((product, i) => (
-                  <Product key={i} product={product.metadata!} />
-                ))}
+            {products && products.length === 0 ? (
+              <EmptyState />
+            ) : products ? (
+              products.map((product, i) => (
+                <Product key={i} product={product.metadata!} />
+              ))
+            ) : (
+              [...Array(12)].map((_, i) => <ProductSkeleton key={i} />)
+            )}
           </div>
         </div>
       </section>
