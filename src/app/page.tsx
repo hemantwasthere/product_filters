@@ -10,6 +10,12 @@ import { useState } from "react";
 import Product from "@/components/Products/Product";
 import ProductSkeleton from "@/components/Products/ProductSkeleton";
 import {
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
+} from "@/components/ui/accordion";
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -17,6 +23,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import type { Product as TProduct } from "@/db";
 import { cn } from "@/lib/utils";
+import { ProductState } from "@/lib/validators/product-validator";
 
 const SORT_OPTIONS = [
   { name: "None", value: "none" },
@@ -24,9 +31,77 @@ const SORT_OPTIONS = [
   { name: "Price: High to Low", value: "price-desc" },
 ] as const;
 
+const COLOR_FILTERS = {
+  id: "color",
+  name: "Color",
+  options: [
+    {
+      value: "white",
+      label: "White",
+    },
+    {
+      value: "beige",
+      label: "Beige",
+    },
+    {
+      value: "blue",
+      label: "Blue",
+    },
+    {
+      value: "green",
+      label: "Green",
+    },
+    {
+      value: "purple",
+      label: "Purple",
+    },
+  ] as const,
+};
+
+const SIZE_FILTERS = {
+  id: "size",
+  name: "Size",
+  options: [
+    { value: "S", label: "S" },
+    { value: "M", label: "M" },
+    { value: "L", label: "L" },
+  ] as const,
+};
+
+const SUBCATEGORIES = [
+  {
+    name: "T-Shirts",
+    selected: true,
+    href: "#",
+  },
+  {
+    name: "Hoodies",
+    selected: false,
+    href: "#",
+  },
+  {
+    name: "Sweatshirts",
+    selected: false,
+    href: "#",
+  },
+  {
+    name: "Accessories",
+    selected: false,
+    href: "#",
+  },
+] as const;
+
+const DEFAULT_CUSTOM_PRICE_RANGE = [0, 100] as [number, number];
+
 const Home: NextPage = () => {
-  const [filter, setFilter] = useState({
+  const [filter, setFilter] = useState<ProductState>({
+    color: ["white", "beige", "blue", "green", "purple"],
+    size: ["S", "M", "L"],
     sort: "none",
+    price: {
+      isCustom: false,
+      range: DEFAULT_CUSTOM_PRICE_RANGE,
+    },
   });
 
   const { data: products } = useQuery({
@@ -43,6 +118,30 @@ const Home: NextPage = () => {
       return data;
     },
   });
+
+  const applyArrayFilter = ({
+    category,
+    value,
+  }: {
+    category: keyof Omit<typeof filter, "sort" | "price">;
+    value: string;
+  }) => {
+    const isFilterApplied = filter[category].includes(value as never);
+
+    if (isFilterApplied) {
+      setFilter((prev) => ({
+        ...prev,
+        [category]: prev[category].filter((v) => v !== value),
+      }));
+    } else {
+      setFilter((prev) => ({
+        ...prev,
+        [category]: [...prev[category], value],
+      }));
+    }
+  };
+
+  console.log(filter);
 
   return (
     <main className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
@@ -88,16 +187,99 @@ const Home: NextPage = () => {
       <section className="pb-24 pt-6">
         <div className="grid grid-cols-1 gap-x-8 gap-y-10 lg:grid-cols-4">
           {/* Filter  */}
-          <div className=""></div>
+          <div className="hidden lg:block">
+            <ul className="space-y-4 border-b border-gray-200 pb-6 text-sm font-medium text-gray-900">
+              {SUBCATEGORIES.map((category, i) => (
+                <li key={i}>
+                  <button
+                    className="disabled:cursor-not-allowed disabled:opacity-60"
+                    disabled={!category.selected}
+                  >
+                    {category.name}
+                  </button>
+                </li>
+              ))}
+            </ul>
+
+            <Accordion type="multiple" className="animate-none">
+              {/* Color Filter  */}
+              <AccordionItem value="color">
+                <AccordionTrigger className="py-3 text-sm text-gray-400 hover:text-gray-500">
+                  <span className="font-medium text-gray-900">Color</span>
+                </AccordionTrigger>
+
+                <AccordionContent className="pt-6 animate-none">
+                  <ul className="space-y-4">
+                    {COLOR_FILTERS.options.map((option, i) => (
+                      <li key={i} className="flex items-center">
+                        <input
+                          id={`color-${i}`}
+                          type="checkbox"
+                          className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                          onChange={() => {
+                            applyArrayFilter({
+                              category: "color",
+                              value: option.value,
+                            });
+                          }}
+                          checked={filter.color.includes(option.value)}
+                        />
+                        <label
+                          htmlFor={`color-${i}`}
+                          className="ml-3 text-sm text-gray-600 select-none"
+                        >
+                          {option.label}
+                        </label>
+                      </li>
+                    ))}
+                  </ul>
+                </AccordionContent>
+              </AccordionItem>
+
+              {/* Size Filter  */}
+              <AccordionItem value="size">
+                <AccordionTrigger className="py-3 text-sm text-gray-400 hover:text-gray-500">
+                  <span className="font-medium text-gray-900">Size</span>
+                </AccordionTrigger>
+
+                <AccordionContent className="pt-6 animate-none">
+                  <ul className="space-y-4">
+                    {SIZE_FILTERS.options.map((option, i) => (
+                      <li key={i} className="flex items-center">
+                        <input
+                          id={`color-${i}`}
+                          type="checkbox"
+                          className="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                          onChange={() => {
+                            applyArrayFilter({
+                              category: "size",
+                              value: option.value,
+                            });
+                          }}
+                          checked={filter.size.includes(option.value)}
+                        />
+                        <label
+                          htmlFor={`color-${i}`}
+                          className="ml-3 text-sm text-gray-600 select-none"
+                        >
+                          {option.label}
+                        </label>
+                      </li>
+                    ))}
+                  </ul>
+                </AccordionContent>
+              </AccordionItem>
+            </Accordion>
+          </div>
 
           {/* Product Grid  */}
-          <ul className="lg:col-span-3 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-8">
+          <div className="lg:col-span-3 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-8">
             {!products
               ? [...Array(12)].map((_, i) => <ProductSkeleton key={i} />)
               : products.map((product, i) => (
                   <Product key={i} product={product.metadata!} />
                 ))}
-          </ul>
+          </div>
         </div>
       </section>
     </main>
